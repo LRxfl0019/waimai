@@ -1,0 +1,11 @@
+# JDK 工具目录
+.tools/
+
+# Maven 本地仓库（依赖缓存，会根据 pom.xml 自动下载）
+.m2/
+
+# Maven 构建产物
+target/
+
+# 日志文件
+*.log

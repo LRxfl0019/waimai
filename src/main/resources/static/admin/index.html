@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>后台管理 | 苍穹外卖</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, "Microsoft YaHei", sans-serif; background: #f4f6fb; color: #172033; }
+    header { height: 60px; padding: 0 24px; background: #fff; border-bottom: 1px solid #e5eaf3; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 2; }
+    header strong { font-size: 18px; }
+    button { border: 0; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    input, select { height: 40px; border: 1px solid #d7deea; border-radius: 8px; padding: 0 12px; background: #fff; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 12px; border-bottom: 1px solid #edf1f7; text-align: left; font-size: 14px; }
+    th { background: #f8fafd; color: #657187; }
+    tr:last-child td { border-bottom: 0; }
+    .login { min-height: calc(100vh - 60px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login form { width: min(420px, 100%); background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; padding: 28px; box-shadow: 0 12px 28px rgba(23,32,51,.08); display: grid; gap: 14px; }
+    .login h1 { margin: 0 0 4px; font-size: 24px; }
+    .app { display: none; grid-template-columns: 220px 1fr; min-height: calc(100vh - 60px); }
+    .app.active { display: grid; }
+    nav { background: #fff; border-right: 1px solid #e5eaf3; padding: 16px; }
+    nav button { width: 100%; height: 42px; margin-bottom: 8px; background: transparent; color: #4d5a70; text-align: left; padding: 0 12px; }
+    nav button.active, .primary { background: #2563eb; color: #fff; }
+    .danger { background: #ef4444; color: #fff; padding: 0 14px; height: 36px; }
+    .secondary { background: #eef2f8; color: #172033; padding: 0 12px; height: 34px; }
+    main { padding: 22px; }
+    .panel { background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; padding: 18px; margin-bottom: 18px; }
+    .panel h2 { margin: 0 0 14px; font-size: 18px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .toolbar .primary { height: 40px; padding: 0 16px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+    .stat { background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; padding: 16px; }
+    .stat span { color: #657187; font-size: 13px; }
+    .stat strong { display: block; margin-top: 8px; font-size: 26px; }
+    .hidden { display: none; }
+    @media (max-width: 760px) { .app { grid-template-columns: 1fr; } nav { display: flex; overflow-x: auto; gap: 8px; } nav button { min-width: 110px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>苍穹外卖 · 管理后台</strong>
+    <div><span id="adminName">未登录</span> <button class="danger" onclick="logout()">退出</button></div>
+  </header>
+
+  <section id="loginView" class="login">
+    <form onsubmit="login(event)">
+      <h1>管理员登录</h1>
+      <input id="username" type="text" value="admin" placeholder="用户名" autocomplete="username">
+      <input id="password" type="password" value="123456" placeholder="密码" autocomplete="current-password">
+      <button class="primary" style="height:44px">登录</button>
+    </form>
+  </section>
+
+  <section id="appView" class="app">
+    <nav id="tabs">
+      <button class="active" data-view="dashboard">数据看板</button>
+      <button data-view="category">分类管理</button>
+      <button data-view="dish">菜品管理</button>
+      <button data-view="setmeal">套餐管理</button>
+      <button data-view="order">订单管理</button>
+    </nav>
+    <main>
+      <div id="dashboard" class="view"></div>
+      <div id="category" class="view hidden"></div>
+      <div id="dish" class="view hidden"></div>
+      <div id="setmeal" class="view hidden"></div>
+      <div id="order" class="view hidden"></div>
+    </main>
+  </section>
+
+  <script>
+    let token = localStorage.getItem('adminToken');
+    const statusText = { 1: '待接单', 2: '已接单', 3: '派送中', 4: '已完成', 5: '已取消' };
+    const money = value => `¥${Number(value || 0).toFixed(2)}`;
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}), ...(token ? { Authorization: token } : {}) }
+      });
+      const body = await res.json();
+      if (body.code !== 1) throw new Error(body.msg || '请求失败');
+      return body.data;
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      const data = await api('/admin/employee/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.value, password: password.value })
+      }).catch(err => alert(err.message));
+      if (!data) return;
+      token = data.token;
+      localStorage.setItem('adminToken', token);
+      adminName.textContent = data.name;
+      showApp();
+      loadDashboard();
+    }
+
+    function logout() {
+      token = null;
+      localStorage.removeItem('adminToken');
+      adminName.textContent = '未登录';
+      loginView.style.display = 'flex';
+      appView.classList.remove('active');
+    }
+
+    function showApp() {
+      loginView.style.display = 'none';
+      appView.classList.add('active');
+    }
+
+    async function loadDashboard() {
+      const data = await api('/admin/dashboard');
+      dashboard.innerHTML = `
+        <div class="stats">
+          <div class="stat"><span>分类数</span><strong>${data.categoryCount}</strong></div>
+          <div class="stat"><span>菜品数</span><strong>${data.dishCount}</strong></div>
+          <div class="stat"><span>套餐数</span><strong>${data.setmealCount}</strong></div>
+          <div class="stat"><span>订单数</span><strong>${data.orderCount}</strong></div>
+          <div class="stat"><span>营业额</span><strong>${money(data.turnover)}</strong></div>
+          <div class="stat"><span>店铺状态</span><strong>${data.shopOpen ? '营业中' : '已打烊'}</strong></div>
+        </div>
+        <div class="panel" style="margin-top:18px">
+          <button class="primary" style="height:40px;padding:0 16px" onclick="toggleShop(${!data.shopOpen})">${data.shopOpen ? '设置打烊' : '开始营业'}</button>
+        </div>`;
+    }
+
+    async function toggleShop(open) {
+      await api('/admin/shop/status', { method: 'PUT', body: JSON.stringify({ open }) });
+      loadDashboard();
+    }
+
+    async function loadCategory() {
+      const list = await api('/admin/category/list');
+      category.innerHTML = `
+        <div class="panel">
+          <h2>新增分类</h2>
+          <div class="toolbar">
+            <input id="catName" placeholder="分类名称">
+            <select id="catType"><option value="1">菜品分类</option><option value="2">套餐分类</option></select>
+            <button class="primary" onclick="saveCategory()">新增</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>分类列表</h2>
+          <table><thead><tr><th>ID</th><th>名称</th><th>类型</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${list.map(item => `<tr><td>${item.id}</td><td>${item.name}</td><td>${item.type === 1 ? '菜品' : '套餐'}</td><td>${item.sort}</td><td>${item.enabled ? '启用' : '禁用'}</td><td><button class="secondary" onclick="categoryStatus(${item.id}, ${!item.enabled})">${item.enabled ? '禁用' : '启用'}</button></td></tr>`).join('')}
+          </tbody></table>
+        </div>`;
+    }
+
+    async function saveCategory() {
+      await api('/admin/category', { method: 'POST', body: JSON.stringify({ name: catName.value, type: Number(catType.value) }) });
+      loadCategory();
+      loadDashboard();
+    }
+
+    async function categoryStatus(id, enabled) {
+      await api(`/admin/category/${id}/status/${enabled}`, { method: 'PUT' });
+      loadCategory();
+    }
+
+    async function loadDish() {
+      const [list, categories] = await Promise.all([api('/admin/dish/list'), api('/admin/category/list?type=1')]);
+      dish.innerHTML = `
+        <div class="panel">
+          <h2>新增菜品</h2>
+          <div class="toolbar">
+            <input id="dishName" placeholder="菜品名称">
+            <input id="dishPrice" type="number" step="0.01" placeholder="价格">
+            <select id="dishCategory">${categories.map(item => `<option value="${item.id}">${item.name}</option>`).join('')}</select>
+            <button class="primary" onclick="saveDish()">新增</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>菜品列表</h2>
+          <table><thead><tr><th>ID</th><th>名称</th><th>价格</th><th>分类ID</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${list.map(item => `<tr><td>${item.id}</td><td>${item.name}</td><td>${money(item.price)}</td><td>${item.categoryId}</td><td>${item.enabled ? '在售' : '停售'}</td><td><button class="secondary" onclick="dishStatus(${item.id}, ${!item.enabled})">${item.enabled ? '停售' : '起售'}</button></td></tr>`).join('')}
+          </tbody></table>
+        </div>`;
+    }
+
+    async function saveDish() {
+      await api('/admin/dish', { method: 'POST', body: JSON.stringify({ name: dishName.value, price: Number(dishPrice.value), categoryId: Number(dishCategory.value), description: '后台新增菜品' }) });
+      loadDish();
+      loadDashboard();
+    }
+
+    async function dishStatus(id, enabled) {
+      await api(`/admin/dish/${id}/status/${enabled}`, { method: 'PUT' });
+      loadDish();
+    }
+
+    async function loadSetmeal() {
+      const [list, categories, dishes] = await Promise.all([api('/admin/setmeal/list'), api('/admin/category/list?type=2'), api('/admin/dish/list')]);
+      setmeal.innerHTML = `
+        <div class="panel">
+          <h2>新增套餐</h2>
+          <div class="toolbar">
+            <input id="setName" placeholder="套餐名称">
+            <input id="setPrice" type="number" step="0.01" placeholder="价格">
+            <select id="setCategory">${categories.map(item => `<option value="${item.id}">${item.name}</option>`).join('')}</select>
+            <select id="setDish">${dishes.map(item => `<option value="${item.id}">${item.name}</option>`).join('')}</select>
+            <button class="primary" onclick="saveSetmeal()">新增</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>套餐列表</h2>
+          <table><thead><tr><th>ID</th><th>名称</th><th>价格</th><th>分类ID</th><th>包含菜品</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${list.map(item => `<tr><td>${item.id}</td><td>${item.name}</td><td>${money(item.price)}</td><td>${item.categoryId}</td><td>${(item.dishIds || []).join(', ')}</td><td>${item.enabled ? '在售' : '停售'}</td><td><button class="secondary" onclick="setmealStatus(${item.id}, ${!item.enabled})">${item.enabled ? '停售' : '起售'}</button></td></tr>`).join('')}
+          </tbody></table>
+        </div>`;
+    }
+
+    async function saveSetmeal() {
+      await api('/admin/setmeal', { method: 'POST', body: JSON.stringify({ name: setName.value, price: Number(setPrice.value), categoryId: Number(setCategory.value), dishIds: [Number(setDish.value)], description: '后台新增套餐' }) });
+      loadSetmeal();
+      loadDashboard();
+    }
+
+    async function setmealStatus(id, enabled) {
+      await api(`/admin/setmeal/${id}/status/${enabled}`, { method: 'PUT' });
+      loadSetmeal();
+    }
+
+    async function loadOrder() {
+      const list = await api('/admin/order/list');
+      order.innerHTML = `
+        <div class="panel">
+          <h2>订单列表</h2>
+          <table><thead><tr><th>ID</th><th>订单号</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
+            ${list.map(item => `<tr><td>${item.id}</td><td>${item.number}</td><td>${money(item.amount)}</td><td>${statusText[item.status] || item.status}</td><td>${String(item.orderTime || '').replace('T', ' ')}</td><td><button class="secondary" onclick="orderNext(${item.id}, ${item.status})">推进</button></td></tr>`).join('')}
+          </tbody></table>
+        </div>`;
+    }
+
+    async function orderNext(id, status) {
+      await api(`/admin/order/${id}/status/${Math.min(status + 1, 4)}`, { method: 'PUT' });
+      loadOrder();
+      loadDashboard();
+    }
+
+    const loaders = { dashboard: loadDashboard, category: loadCategory, dish: loadDish, setmeal: loadSetmeal, order: loadOrder };
+    tabs.addEventListener('click', event => {
+      const button = event.target.closest('button[data-view]');
+      if (!button) return;
+      document.querySelectorAll('nav button').forEach(item => item.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(item => item.classList.add('hidden'));
+      button.classList.add('active');
+      document.getElementById(button.dataset.view).classList.remove('hidden');
+      loaders[button.dataset.view]().catch(err => alert(err.message));
+    });
+
+    if (token) {
+      adminName.textContent = 'liurui';
+      showApp();
+      loadDashboard().catch(() => logout());
+    }
+  </script>
+</body>
+</html>

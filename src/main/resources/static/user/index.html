@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户点餐 | 苍穹外卖</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, "Microsoft YaHei", sans-serif; background: #f5f7fb; color: #172033; }
+    header { height: 60px; padding: 0 24px; background: #fff; border-bottom: 1px solid #e5eaf3; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 2; }
+    header strong { font-size: 18px; }
+    button { border: 0; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    input { height: 40px; border: 1px solid #d7deea; border-radius: 8px; padding: 0 12px; background: #fff; }
+    .login { min-height: calc(100vh - 60px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login form { width: min(420px, 100%); background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; padding: 28px; box-shadow: 0 12px 28px rgba(23,32,51,.08); display: grid; gap: 14px; }
+    .login h1 { margin: 0 0 4px; font-size: 24px; }
+    .app { display: none; grid-template-columns: 210px minmax(0, 1fr) 330px; gap: 18px; max-width: 1380px; margin: 0 auto; padding: 18px; }
+    .app.active { display: grid; }
+    .panel, .categories, .cart { background: #fff; border: 1px solid #e5eaf3; border-radius: 8px; padding: 16px; }
+    .categories, .cart { height: fit-content; position: sticky; top: 78px; }
+    .categories h2, .cart h2, .panel h2 { margin: 0 0 14px; font-size: 17px; }
+    .categories button { width: 100%; height: 40px; margin-bottom: 8px; background: transparent; color: #4d5a70; text-align: left; padding: 0 12px; }
+    .categories button.active, .primary { background: #16a34a; color: #fff; }
+    .secondary { background: #eef2f8; color: #172033; height: 34px; padding: 0 12px; }
+    .danger { background: #ef4444; color: #fff; height: 34px; padding: 0 12px; }
+    .menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+    .item { border: 1px solid #e5eaf3; border-radius: 8px; padding: 14px; background: #fff; display: grid; gap: 8px; }
+    .item .image { height: 92px; border-radius: 8px; background: #ecfdf5; display: grid; place-items: center; font-size: 34px; }
+    .item h3 { margin: 0; font-size: 16px; }
+    .item p { margin: 0; min-height: 38px; color: #657187; line-height: 1.5; font-size: 13px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .price { color: #dc2626; font-weight: 700; }
+    .cart-list { display: grid; gap: 8px; }
+    .cart-item, .address-item, .order-item { background: #f8fafd; border: 1px solid #edf1f7; border-radius: 8px; padding: 10px; }
+    .address-item { cursor: pointer; }
+    .address-item.active { border-color: #16a34a; background: #ecfdf5; }
+    .form { display: grid; gap: 8px; margin-top: 10px; }
+    .total { display: flex; justify-content: space-between; margin: 14px 0; padding-top: 12px; border-top: 1px solid #e5eaf3; font-size: 18px; font-weight: 700; }
+    .status { padding: 6px 10px; border-radius: 999px; font-size: 13px; background: #eef2f8; }
+    .status.open { background: #dcfce7; color: #15803d; }
+    .status.closed { background: #fee2e2; color: #b91c1c; }
+    .hidden { display: none; }
+    @media (max-width: 1040px) { .app { grid-template-columns: 1fr; } .categories, .cart { position: static; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>苍穹外卖 · 用户点餐</strong>
+    <div><span id="shopStatus" class="status">检测中</span> <button class="danger" onclick="logout()">退出</button></div>
+  </header>
+
+  <section id="loginView" class="login">
+    <form onsubmit="login(event)">
+      <h1>用户登录</h1>
+      <input id="username" type="text" value="liurui" placeholder="用户名" autocomplete="username">
+      <input id="password" type="password" value="123456" placeholder="密码" autocomplete="current-password">
+      <button class="primary" style="height:44px">登录</button>
+    </form>
+  </section>
+
+  <main id="appView" class="app">
+    <aside class="categories">
+      <h2>美食分类</h2>
+      <div id="categoryList"></div>
+    </aside>
+    <section class="panel">
+      <h2 id="menuTitle">菜单列表</h2>
+      <div id="menuGrid" class="menu"></div>
+    </section>
+    <aside class="cart">
+      <h2>购物车</h2>
+      <div id="cartList" class="cart-list"></div>
+      <div class="total"><span>合计</span><span id="totalPrice" class="price">¥0.00</span></div>
+      <div class="row">
+        <button class="secondary" onclick="clearCart()">清空</button>
+        <button class="primary" style="height:34px;padding:0 12px" onclick="submitOrder()">提交订单</button>
+      </div>
+
+      <h2 style="margin-top:22px">收货地址</h2>
+      <div id="addressList"></div>
+      <div class="form">
+        <input id="consignee" placeholder="收货人">
+        <input id="phone" placeholder="手机号">
+        <input id="detail" placeholder="详细地址">
+        <button class="primary" style="height:40px" onclick="saveAddress()">保存地址</button>
+      </div>
+
+      <h2 style="margin-top:22px">历史订单</h2>
+      <div id="orderList" class="cart-list"></div>
+    </aside>
+  </main>
+
+  <script>
+    let token = localStorage.getItem('userToken');
+    let activeCategory = null;
+    let selectedAddressId = null;
+    const money = value => `¥${Number(value || 0).toFixed(2)}`;
+    const statusText = { 1: '待接单', 2: '已接单', 3: '派送中', 4: '已完成', 5: '已取消' };
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}), ...(token ? { Authorization: token } : {}) }
+      });
+      const body = await res.json();
+      if (body.code !== 1) throw new Error(body.msg || '请求失败');
+      return body.data;
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      const data = await api('/user/user/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: username.value, password: password.value })
+      }).catch(err => alert(err.message));
+      if (!data) return;
+      token = data.token;
+      localStorage.setItem('userToken', token);
+      showApp();
+      await refreshAll();
+    }
+
+    function logout() {
+      token = null;
+      localStorage.removeItem('userToken');
+      loginView.style.display = 'flex';
+      appView.classList.remove('active');
+    }
+
+    function showApp() {
+      loginView.style.display = 'none';
+      appView.classList.add('active');
+    }
+
+    async function refreshAll() {
+      await Promise.all([loadStatus(), loadCategories(), loadCart(), loadAddresses(), loadOrders()]);
+    }
+
+    async function loadStatus() {
+      const data = await api('/user/shop/status');
+      shopStatus.textContent = data.open ? '营业中' : '已打烊';
+      shopStatus.className = `status ${data.open ? 'open' : 'closed'}`;
+    }
+
+    async function loadCategories() {
+      const list = await api('/user/category/list');
+      if (!activeCategory && list.length) activeCategory = list[0].id;
+      categoryList.innerHTML = list.map(item => `<button class="${item.id === activeCategory ? 'active' : ''}" onclick="selectCategory(${item.id}, '${item.name}')">${item.name}</button>`).join('');
+      if (activeCategory) await loadMenu();
+    }
+
+    async function selectCategory(id, name) {
+      activeCategory = id;
+      menuTitle.textContent = name;
+      await loadCategories();
+    }
+
+    async function loadMenu() {
+      const [dishes, setmeals] = await Promise.all([
+        api(`/user/dish/list?categoryId=${activeCategory}`),
+        api(`/user/setmeal/list?categoryId=${activeCategory}`)
+      ]);
+      const cards = [
+        ...dishes.map(item => menuCard(item, 'dish')),
+        ...setmeals.map(item => menuCard(item, 'setmeal'))
+      ];
+      menuGrid.innerHTML = cards.length ? cards.join('') : '<p style="color:#657187">当前分类暂无可售商品。</p>';
+    }
+
+    function menuCard(item, type) {
+      const payload = type === 'dish' ? `{ dishId: ${item.id} }` : `{ setmealId: ${item.id} }`;
+      return `<article class="item">
+        <div class="image">${type === 'dish' ? '🍱' : '🥘'}</div>
+        <h3>${item.name}</h3>
+        <p>${item.description || '暂无描述'}</p>
+        <div class="row"><span class="price">${money(item.price)}</span><button class="primary" style="height:34px;padding:0 12px" onclick="addCart(${payload})">加入</button></div>
+      </article>`;
+    }
+
+    async function addCart(payload) {
+      await api('/user/shoppingCart/add', { method: 'POST', body: JSON.stringify({ ...payload, number: 1 }) });
+      loadCart();
+    }
+
+    async function loadCart() {
+      const list = await api('/user/shoppingCart/list');
+      cartList.innerHTML = list.length ? list.map(item => `<div class="cart-item"><div class="row"><strong>${item.name}</strong><span>${item.number} 份</span></div><div class="price">${money(Number(item.amount) * item.number)}</div></div>`).join('') : '<p style="color:#657187">购物车为空。</p>';
+      const total = list.reduce((sum, item) => sum + Number(item.amount || 0) * Number(item.number || 0), 0);
+      totalPrice.textContent = money(total);
+    }
+
+    async function clearCart() {
+      await api('/user/shoppingCart/clean', { method: 'DELETE' });
+      loadCart();
+    }
+
+    async function loadAddresses() {
+      const list = await api('/user/addressBook/list');
+      if (!selectedAddressId && list.length) selectedAddressId = list.find(item => item.defaultAddress)?.id || list[0].id;
+      addressList.innerHTML = list.map(item => `<div class="address-item ${item.id === selectedAddressId ? 'active' : ''}" onclick="selectAddress(${item.id})"><strong>${item.consignee}</strong> ${item.phone}<br><span>${item.detail}${item.defaultAddress ? ' · 默认' : ''}</span></div>`).join('');
+    }
+
+    async function selectAddress(id) {
+      selectedAddressId = id;
+      await api(`/user/addressBook/${id}/default`, { method: 'PUT' });
+      loadAddresses();
+    }
+
+    async function saveAddress() {
+      await api('/user/addressBook', {
+        method: 'POST',
+        body: JSON.stringify({ consignee: consignee.value, phone: phone.value, detail: detail.value, defaultAddress: true })
+      });
+      consignee.value = '';
+      phone.value = '';
+      detail.value = '';
+      selectedAddressId = null;
+      loadAddresses();
+    }
+
+    async function submitOrder() {
+      if (!selectedAddressId) {
+        alert('请先选择或新增收货地址');
+        return;
+      }
+      await api('/user/order/submit', { method: 'POST', body: JSON.stringify({ addressId: selectedAddressId, remark: '网页端下单' }) }).catch(err => alert(err.message));
+      await Promise.all([loadCart(), loadOrders()]);
+    }
+
+    async function loadOrders() {
+      const list = await api('/user/order/historyOrders');
+      orderList.innerHTML = list.length ? list.map(item => `<div class="order-item"><div class="row"><strong>${item.number}</strong><span>${statusText[item.status] || item.status}</span></div><div class="row"><span>${String(item.orderTime || '').replace('T', ' ')}</span><span class="price">${money(item.amount)}</span></div></div>`).join('') : '<p style="color:#657187">暂无订单。</p>';
+    }
+
+    if (token) {
+      showApp();
+      refreshAll().catch(() => logout());
+    }
+  </script>
+</body>
+</html>

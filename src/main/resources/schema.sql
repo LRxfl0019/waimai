@@ -1,0 +1,96 @@
+CREATE TABLE IF NOT EXISTS employee (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS customer (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    phone VARCHAR(20),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS category (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    type INT NOT NULL,
+    sort INT NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS dish (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    category_id BIGINT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description VARCHAR(500),
+    image VARCHAR(500),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS setmeal (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    category_id BIGINT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description VARCHAR(500),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS setmeal_dish (
+    setmeal_id BIGINT NOT NULL,
+    dish_id BIGINT NOT NULL,
+    PRIMARY KEY (setmeal_id, dish_id)
+);
+
+CREATE TABLE IF NOT EXISTS address_book (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customer_id BIGINT NOT NULL DEFAULT 1,
+    consignee VARCHAR(50) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    detail VARCHAR(255) NOT NULL,
+    default_address BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS cart_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customer_id BIGINT NOT NULL DEFAULT 1,
+    name VARCHAR(120) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    number INT NOT NULL,
+    dish_id BIGINT,
+    setmeal_id BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    number VARCHAR(60) NOT NULL UNIQUE,
+    status INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    address_id BIGINT NOT NULL,
+    order_time TIMESTAMP NOT NULL,
+    remark VARCHAR(500)
+);
+
+CREATE TABLE IF NOT EXISTS order_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    number INT NOT NULL,
+    dish_id BIGINT,
+    setmeal_id BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS shop_status (
+    id INT PRIMARY KEY,
+    open_flag BOOLEAN NOT NULL
+);
